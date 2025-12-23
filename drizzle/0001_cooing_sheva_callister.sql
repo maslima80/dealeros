@@ -1,0 +1,1 @@
+ALTER TABLE "vehicles" ADD COLUMN "asking_price_cents" integer;
