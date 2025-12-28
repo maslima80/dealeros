@@ -69,26 +69,30 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="hidden w-56 shrink-0 lg:block">
-      <nav className="sticky top-24 space-y-1">
-        {navItems.map((item) => {
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                active
-                  ? "bg-zinc-900 text-white"
-                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+    <aside className="hidden w-60 shrink-0 lg:block">
+      <div className="sticky top-24">
+        <nav className="space-y-1 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-zinc-200/50">
+          {navItems.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                  active
+                    ? "bg-gradient-to-r from-zinc-900 to-zinc-800 text-white shadow-sm"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                <span className={`transition-transform ${active ? "" : "group-hover:scale-110"}`}>
+                  {item.icon}
+                </span>
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
     </aside>
   );
 }
@@ -104,26 +108,26 @@ export function MobileNav() {
   }
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-200 bg-white pb-safe lg:hidden">
-      <div className="flex items-stretch justify-around">
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-100 bg-white/95 backdrop-blur-lg pb-safe lg:hidden">
+      <div className="flex items-stretch justify-around px-2">
         {navItems.map((item) => {
           const active = isActive(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium transition-colors ${
+              className={`relative flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-xs font-medium transition-all ${
                 active
                   ? "text-zinc-900"
-                  : "text-zinc-500"
+                  : "text-zinc-400"
               }`}
             >
-              <span className={`${active ? "text-zinc-900" : "text-zinc-400"}`}>
+              <span className={`transition-all ${active ? "scale-110 text-zinc-900" : ""}`}>
                 {item.icon}
               </span>
-              <span>{item.label}</span>
+              <span className={active ? "font-semibold" : ""}>{item.label}</span>
               {active && (
-                <span className="absolute bottom-1 h-1 w-8 rounded-full bg-zinc-900" />
+                <span className="absolute top-1 h-1 w-6 rounded-full bg-gradient-to-r from-zinc-800 to-zinc-600" />
               )}
             </Link>
           );
