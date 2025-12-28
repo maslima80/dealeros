@@ -12,7 +12,7 @@ import {
   formatPrice,
 } from "@/lib/public-data";
 
-import { TestDrivePlaceholder } from "./test-drive-placeholder";
+import { BookingForm } from "./booking-form";
 
 export async function generateMetadata({
   params,
@@ -233,8 +233,8 @@ export default async function PublicVehiclePage({
             </div>
           </div>
 
-          {/* Test Drive Placeholder */}
-          <TestDrivePlaceholder />
+          {/* Booking Form */}
+          <BookingForm vehicleId={vehicle.id} dealerId={dealer.id} />
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid, index } from "drizzle-orm/pg-core";
+import { boolean, date, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid, index } from "drizzle-orm/pg-core";
 
 export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "trial",
@@ -89,6 +89,10 @@ export const vehicles = pgTable(
     status: vehicleStatusEnum("status").notNull().default("purchased"),
     isPublic: boolean("is_public").notNull().default(false),
     notes: text("notes"),
+    soldAt: timestamp("sold_at", { withTimezone: true }),
+    soldPriceCents: integer("sold_price_cents"),
+    soldCurrency: text("sold_currency").default("CAD"),
+    buyerName: text("buyer_name"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -243,6 +247,73 @@ export const catalogVehicles = pgTable(
     catalogIdIdx: index("catalog_vehicles_catalog_id_idx").on(t.catalogId),
     vehicleIdIdx: index("catalog_vehicles_vehicle_id_idx").on(t.vehicleId),
     catalogVehicleUnique: unique("catalog_vehicles_catalog_vehicle_unique").on(t.catalogId, t.vehicleId),
+  }),
+);
+
+export const bookingStatusEnum = pgEnum("booking_status", [
+  "new",
+  "handled",
+  "archived",
+]);
+
+export const bookingRequests = pgTable(
+  "booking_requests",
+  {
+    id: uuid("id").primaryKey(),
+    dealerId: uuid("dealer_id")
+      .notNull()
+      .references(() => dealers.id, { onDelete: "cascade" }),
+    vehicleId: uuid("vehicle_id")
+      .notNull()
+      .references(() => vehicles.id, { onDelete: "cascade" }),
+    status: bookingStatusEnum("status").notNull().default("new"),
+    customerName: text("customer_name").notNull(),
+    customerPhone: text("customer_phone"),
+    customerEmail: text("customer_email"),
+    preferredTime: text("preferred_time"),
+    message: text("message"),
+    source: text("source").notNull().default("public_vehicle_page"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    dealerIdIdx: index("booking_requests_dealer_id_idx").on(t.dealerId),
+    vehicleIdIdx: index("booking_requests_vehicle_id_idx").on(t.vehicleId),
+  }),
+);
+
+export const vehicleSales = pgTable(
+  "vehicle_sales",
+  {
+    id: uuid("id").primaryKey(),
+    dealerId: uuid("dealer_id")
+      .notNull()
+      .references(() => dealers.id, { onDelete: "cascade" }),
+    vehicleId: uuid("vehicle_id")
+      .notNull()
+      .references(() => vehicles.id, { onDelete: "cascade" })
+      .unique(),
+    saleDate: date("sale_date").notNull(),
+    salePriceCents: integer("sale_price_cents").notNull(),
+    currency: text("currency").notNull().default("CAD"),
+    buyerFullName: text("buyer_full_name").notNull(),
+    buyerPhone: text("buyer_phone"),
+    buyerEmail: text("buyer_email"),
+    buyerAddress: text("buyer_address"),
+    vin: text("vin").notNull(),
+    year: integer("year"),
+    make: text("make"),
+    model: text("model"),
+    trim: text("trim"),
+    odometer: integer("odometer"),
+    asIs: boolean("as_is").notNull().default(true),
+    notes: text("notes"),
+    pdfUrl: text("pdf_url"),
+    pdfGeneratedAt: timestamp("pdf_generated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    dealerIdIdx: index("vehicle_sales_dealer_id_idx").on(t.dealerId),
+    vehicleIdIdx: index("vehicle_sales_vehicle_id_idx").on(t.vehicleId),
   }),
 );
 

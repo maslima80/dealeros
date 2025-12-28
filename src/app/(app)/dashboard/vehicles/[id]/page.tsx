@@ -8,6 +8,7 @@ import { getVehicleById } from "@/lib/vehicles";
 import { getPhotosForVehicle } from "@/lib/vehicle-photos";
 import { getCostsForVehicle, getAdditionalCostsTotalForVehicle } from "@/lib/vehicle-costs";
 import { generateListingPayload } from "@/lib/listing-kit";
+import { getSaleByVehicleId } from "@/lib/sales";
 import { PageHeader } from "@/components/ui";
 
 import { VehicleDetailClient } from "./vehicle-detail-client";
@@ -15,6 +16,7 @@ import { VehiclePhotosSection } from "./vehicle-photos-section";
 import { MarketSnapshotCard } from "./market-snapshot-card";
 import { CostsSection } from "./costs-section";
 import { ListingKitSection } from "./listing-kit-section";
+import { SaleSection } from "./sale-section";
 
 export default async function VehicleDetailPage({
   params,
@@ -37,7 +39,7 @@ export default async function VehicleDetailPage({
     notFound();
   }
 
-  const [photos, costs, additionalCostsCents, listingPayload] = await Promise.all([
+  const [photos, costs, additionalCostsCents, listingPayload, sale] = await Promise.all([
     getPhotosForVehicle({
       vehicleId: id,
       dealerId: ctx.dealerId,
@@ -51,6 +53,10 @@ export default async function VehicleDetailPage({
       dealerId: ctx.dealerId,
     }),
     generateListingPayload({
+      vehicleId: id,
+      dealerId: ctx.dealerId,
+    }),
+    getSaleByVehicleId({
       vehicleId: id,
       dealerId: ctx.dealerId,
     }),
@@ -103,6 +109,19 @@ export default async function VehicleDetailPage({
         subtitle={ymmt ? vehicle.vin : undefined}
         backHref="/dashboard/vehicles"
         backLabel="Back to vehicles"
+      />
+
+      <SaleSection
+        vehicleId={vehicle.id}
+        vehicleStatus={vehicle.status}
+        odometerKm={vehicle.odometerKm}
+        sale={sale ? {
+          id: sale.id,
+          saleDate: sale.saleDate,
+          salePriceCents: sale.salePriceCents,
+          buyerFullName: sale.buyerFullName,
+          pdfUrl: sale.pdfUrl,
+        } : null}
       />
 
       <VehiclePhotosSection
