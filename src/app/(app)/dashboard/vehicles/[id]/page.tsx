@@ -7,12 +7,14 @@ import { getDealerContext } from "@/lib/dealer-context";
 import { getVehicleById } from "@/lib/vehicles";
 import { getPhotosForVehicle } from "@/lib/vehicle-photos";
 import { getCostsForVehicle, getAdditionalCostsTotalForVehicle } from "@/lib/vehicle-costs";
+import { generateListingPayload } from "@/lib/listing-kit";
 import { PageHeader } from "@/components/ui";
 
 import { VehicleDetailClient } from "./vehicle-detail-client";
 import { VehiclePhotosSection } from "./vehicle-photos-section";
 import { MarketSnapshotCard } from "./market-snapshot-card";
 import { CostsSection } from "./costs-section";
+import { ListingKitSection } from "./listing-kit-section";
 
 export default async function VehicleDetailPage({
   params,
@@ -35,7 +37,7 @@ export default async function VehicleDetailPage({
     notFound();
   }
 
-  const [photos, costs, additionalCostsCents] = await Promise.all([
+  const [photos, costs, additionalCostsCents, listingPayload] = await Promise.all([
     getPhotosForVehicle({
       vehicleId: id,
       dealerId: ctx.dealerId,
@@ -45,6 +47,10 @@ export default async function VehicleDetailPage({
       dealerId: ctx.dealerId,
     }),
     getAdditionalCostsTotalForVehicle({
+      vehicleId: id,
+      dealerId: ctx.dealerId,
+    }),
+    generateListingPayload({
       vehicleId: id,
       dealerId: ctx.dealerId,
     }),
@@ -147,6 +153,17 @@ export default async function VehicleDetailPage({
           notes: vehicle.notes,
         }}
       />
+
+      {listingPayload && (
+        <ListingKitSection
+          vehicleId={vehicle.id}
+          headline={listingPayload.listing.headline}
+          description={listingPayload.listing.description}
+          specsText={listingPayload.listing.specsText}
+          publicVehicleUrl={listingPayload.publicVehicleUrl}
+          hasPhotos={listingPayload.photos.length > 0}
+        />
+      )}
     </div>
   );
 }
