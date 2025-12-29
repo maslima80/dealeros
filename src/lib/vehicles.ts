@@ -69,7 +69,18 @@ export async function createVehicle(params: {
   make?: string | null;
   model?: string | null;
   trim?: string | null;
+  bodyStyle?: string | null;
+  drivetrain?: string | null;
+  transmission?: string | null;
+  engine?: string | null;
+  fuelType?: string | null;
+  doors?: number | null;
+  seats?: number | null;
   odometerKm?: number | null;
+  mileageUnit?: "KM" | "MI";
+  stockNumber?: string | null;
+  exteriorColor?: string | null;
+  interiorColor?: string | null;
   notes?: string | null;
 }) {
   const now = new Date();
@@ -87,7 +98,18 @@ export async function createVehicle(params: {
         make: params.make?.trim() || null,
         model: params.model?.trim() || null,
         trim: params.trim?.trim() || null,
+        bodyStyle: params.bodyStyle?.trim() || null,
+        drivetrain: params.drivetrain?.trim() || null,
+        transmission: params.transmission?.trim() || null,
+        engine: params.engine?.trim() || null,
+        fuelType: params.fuelType?.trim() || null,
+        doors: params.doors ?? null,
+        seats: params.seats ?? null,
         odometerKm: params.odometerKm ?? null,
+        mileageUnit: params.mileageUnit || "KM",
+        stockNumber: params.stockNumber?.trim() || null,
+        exteriorColor: params.exteriorColor?.trim() || null,
+        interiorColor: params.interiorColor?.trim() || null,
         notes: params.notes?.trim() || null,
         status: "purchased",
         isPublic: false,

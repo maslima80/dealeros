@@ -7,7 +7,7 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@/db/client";
 import { dealers, marketSnapshots, vehicles } from "@/db/schema";
 import { requireDealerContext } from "@/lib/dealer-context";
-import { fetchMarketCheckStats, isError } from "@/lib/marketcheck";
+import { fetchMarketCheckStats, isError, type ComparableListing } from "@/lib/marketcheck";
 
 export type MarketSnapshotData = {
   id: string;
@@ -27,6 +27,9 @@ export type MarketSnapshotData = {
   dealerListingsCount: number | null;
   privateListingsCount: number | null;
   marketDemandScore: string | null;
+  maxDistanceMiles: number | null;
+  country: "us" | "ca";
+  listings: ComparableListing[];
   retrievedAt: Date;
   raw: unknown;
 };
@@ -37,6 +40,7 @@ type ActionResult =
 
 export async function fetchMarketSnapshotAction(input: {
   vehicleId: string;
+  postalCode?: string;
 }): Promise<ActionResult> {
   const ctx = await requireDealerContext();
 
@@ -60,14 +64,19 @@ export async function fetchMarketSnapshotAction(input: {
     return { ok: false, message: "Vehicle has no VIN" };
   }
 
-  const dealerRows = await db
-    .select()
-    .from(dealers)
-    .where(eq(dealers.id, ctx.dealerId))
-    .limit(1);
+  // Use custom postal code if provided, otherwise fall back to dealer's postal code
+  let postalCode = input.postalCode?.trim() || null;
+  
+  if (!postalCode) {
+    const dealerRows = await db
+      .select()
+      .from(dealers)
+      .where(eq(dealers.id, ctx.dealerId))
+      .limit(1);
 
-  const dealer = dealerRows[0];
-  const postalCode = dealer?.postalCode ?? null;
+    const dealer = dealerRows[0];
+    postalCode = dealer?.postalCode ?? null;
+  }
 
   const vin = vehicle.vin.trim().toUpperCase();
   const radiusMiles = 100;
@@ -99,7 +108,16 @@ export async function fetchMarketSnapshotAction(input: {
 
   let snapshotId: string;
 
-  const snapshotData = {
+  // Store listings, country, and maxDistanceMiles in raw for persistence
+  const rawWithListings = {
+    ...result.raw,
+    listings: result.listings,
+    country: result.country,
+    maxDistanceMiles: result.maxDistanceMiles,
+  };
+
+  // Database fields (only columns that exist in schema)
+  const dbSnapshotData = {
     vin,
     source: "marketcheck",
     radiusMiles,
@@ -117,15 +135,23 @@ export async function fetchMarketSnapshotAction(input: {
     privateListingsCount: result.privateListingsCount,
     marketDemandScore: result.marketDemandScore,
     retrievedAt: now,
-    raw: result.raw,
+    raw: rawWithListings,
     updatedAt: now,
+  };
+
+  // Full snapshot data for return (includes non-DB fields)
+  const snapshotData = {
+    ...dbSnapshotData,
+    maxDistanceMiles: result.maxDistanceMiles,
+    country: result.country,
+    listings: result.listings,
   };
 
   if (existingRows[0]) {
     snapshotId = existingRows[0].id;
     await db
       .update(marketSnapshots)
-      .set(snapshotData)
+      .set(dbSnapshotData)
       .where(eq(marketSnapshots.id, snapshotId));
   } else {
     snapshotId = randomUUID();
@@ -133,7 +159,7 @@ export async function fetchMarketSnapshotAction(input: {
       id: snapshotId,
       dealerId: ctx.dealerId,
       vehicleId: input.vehicleId,
-      ...snapshotData,
+      ...dbSnapshotData,
       createdAt: now,
     });
   }
@@ -168,6 +194,10 @@ export async function getMarketSnapshotAction(input: {
   const snapshot = rows[0];
   if (!snapshot) return null;
 
+  // Extract listings from raw if available (for backwards compatibility)
+  const rawData = snapshot.raw as { listings?: ComparableListing[] } | null;
+  const listings = rawData?.listings ?? [];
+
   return {
     id: snapshot.id,
     vin: snapshot.vin,
@@ -186,6 +216,9 @@ export async function getMarketSnapshotAction(input: {
     dealerListingsCount: snapshot.dealerListingsCount,
     privateListingsCount: snapshot.privateListingsCount,
     marketDemandScore: snapshot.marketDemandScore,
+    maxDistanceMiles: (snapshot.raw as { maxDistanceMiles?: number } | null)?.maxDistanceMiles ?? null,
+    country: ((snapshot.raw as { country?: string } | null)?.country as "us" | "ca") ?? "us",
+    listings,
     retrievedAt: snapshot.retrievedAt,
     raw: snapshot.raw,
   };

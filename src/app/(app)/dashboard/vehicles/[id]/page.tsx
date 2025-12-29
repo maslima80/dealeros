@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { eq, and } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { marketSnapshots } from "@/db/schema";
+import { dealers, marketSnapshots } from "@/db/schema";
 import { getDealerContext } from "@/lib/dealer-context";
 import { getVehicleById } from "@/lib/vehicles";
 import { getPhotosForVehicle } from "@/lib/vehicle-photos";
@@ -62,16 +62,33 @@ export default async function VehicleDetailPage({
     }),
   ]);
 
-  const snapshotRows = await db
-    .select()
-    .from(marketSnapshots)
-    .where(
-      and(
-        eq(marketSnapshots.vehicleId, id),
-        eq(marketSnapshots.dealerId, ctx.dealerId)
+  // Fetch dealer postal code and market snapshot in parallel
+  const [snapshotRows, dealerRows] = await Promise.all([
+    db
+      .select()
+      .from(marketSnapshots)
+      .where(
+        and(
+          eq(marketSnapshots.vehicleId, id),
+          eq(marketSnapshots.dealerId, ctx.dealerId)
+        )
       )
-    )
-    .limit(1);
+      .limit(1),
+    db
+      .select({ postalCode: dealers.postalCode })
+      .from(dealers)
+      .where(eq(dealers.id, ctx.dealerId))
+      .limit(1),
+  ]);
+
+  const dealerPostalCode = dealerRows[0]?.postalCode ?? null;
+
+  // Extract new fields from raw data for backwards compatibility
+  const rawData = snapshotRows[0]?.raw as { 
+    listings?: unknown[]; 
+    maxDistanceMiles?: number;
+    country?: string;
+  } | null;
 
   const existingSnapshot = snapshotRows[0]
     ? {
@@ -92,6 +109,9 @@ export default async function VehicleDetailPage({
         dealerListingsCount: snapshotRows[0].dealerListingsCount,
         privateListingsCount: snapshotRows[0].privateListingsCount,
         marketDemandScore: snapshotRows[0].marketDemandScore,
+        maxDistanceMiles: rawData?.maxDistanceMiles ?? null,
+        country: (rawData?.country as "us" | "ca") ?? "us",
+        listings: (rawData?.listings ?? []) as import("@/lib/marketcheck").ComparableListing[],
         retrievedAt: snapshotRows[0].retrievedAt,
         raw: snapshotRows[0].raw,
       }
@@ -138,6 +158,7 @@ export default async function VehicleDetailPage({
         vehicleId={vehicle.id}
         initialSnapshot={existingSnapshot}
         vin={vehicle.vin ?? undefined}
+        dealerPostalCode={dealerPostalCode}
       />
 
       <CostsSection
@@ -166,10 +187,43 @@ export default async function VehicleDetailPage({
           make: vehicle.make,
           model: vehicle.model,
           trim: vehicle.trim,
+          bodyStyle: vehicle.bodyStyle,
+          drivetrain: vehicle.drivetrain,
+          transmission: vehicle.transmission,
+          engine: vehicle.engine,
+          fuelType: vehicle.fuelType,
+          doors: vehicle.doors,
+          seats: vehicle.seats,
           odometerKm: vehicle.odometerKm,
+          mileageUnit: vehicle.mileageUnit,
+          exteriorColor: vehicle.exteriorColor,
+          interiorColor: vehicle.interiorColor,
+          stockNumber: vehicle.stockNumber,
           status: vehicle.status,
           isPublic: vehicle.isPublic,
           notes: vehicle.notes,
+          // Feature flags
+          hasSunroof: vehicle.hasSunroof,
+          hasNavigation: vehicle.hasNavigation,
+          hasBackupCamera: vehicle.hasBackupCamera,
+          hasParkingSensors: vehicle.hasParkingSensors,
+          hasBlindSpotMonitor: vehicle.hasBlindSpotMonitor,
+          hasHeatedSeats: vehicle.hasHeatedSeats,
+          hasRemoteStart: vehicle.hasRemoteStart,
+          hasAppleCarplay: vehicle.hasAppleCarplay,
+          hasAndroidAuto: vehicle.hasAndroidAuto,
+          hasBluetooth: vehicle.hasBluetooth,
+          hasLeather: vehicle.hasLeather,
+          hasThirdRow: vehicle.hasThirdRow,
+          hasTowPackage: vehicle.hasTowPackage,
+          hasAlloyWheels: vehicle.hasAlloyWheels,
+          // Custom features
+          customFeatures: (vehicle.customFeatures as string[]) ?? [],
+          // Decode metadata
+          decodeProvider: vehicle.decodeProvider,
+          decodeStatus: vehicle.decodeStatus,
+          decodedAt: vehicle.decodedAt,
+          equipmentRaw: vehicle.equipmentRaw as string[] | null,
         }}
       />
 

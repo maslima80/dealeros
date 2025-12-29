@@ -15,6 +15,9 @@ export type MarketCheckStats = {
   dealerListingsCount: number | null;
   privateListingsCount: number | null;
   marketDemandScore: string | null;
+  maxDistanceMiles: number | null;
+  country: "us" | "ca";
+  listings: ComparableListing[];
   raw: Record<string, unknown> | null;
 };
 
@@ -37,12 +40,16 @@ type Listing = {
   dom?: number;
   dom_active?: number;
   dom_180?: number;
+  dist?: number; // Distance from search location in miles
   city?: string;
   state?: string;
   zip?: string;
   dealer_type?: string;
   seller_type?: string;
   inventory_type?: string;
+  heading?: string;
+  vdp_url?: string;
+  // These fields may be at root level OR nested in 'build' object
   year?: number;
   make?: string;
   model?: string;
@@ -53,8 +60,39 @@ type Listing = {
   transmission?: string;
   engine?: string;
   fuel_type?: string;
-  heading?: string;
-  vdp_url?: string;
+  // Nested build object (MarketCheck API structure)
+  build?: {
+    year?: number;
+    make?: string;
+    model?: string;
+    trim?: string;
+    exterior_color?: string;
+    interior_color?: string;
+    drivetrain?: string;
+    transmission?: string;
+    engine?: string;
+    fuel_type?: string;
+  };
+};
+
+// Exported type for client-side filtering
+export type ComparableListing = {
+  price: number | null;
+  miles: number | null;
+  daysOnMarket: number | null;
+  distanceMiles: number | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  dealerType: string | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  trim: string | null;
+  exteriorColor: string | null;
+  transmission: string | null;
+  heading: string | null;
+  vdpUrl: string | null;
 };
 
 function calculateMedian(arr: number[]): number {
@@ -84,6 +122,17 @@ function calculateDemandScore(params: {
   return "saturated";
 }
 
+/**
+ * Detect if a postal code is Canadian (letter-number-letter pattern)
+ * Canadian: A1A 1A1, A1A1A1
+ * US: 12345, 12345-6789
+ */
+function isCanadianPostalCode(postalCode: string): boolean {
+  const cleaned = postalCode.replace(/\s/g, "").toUpperCase();
+  // Canadian postal codes start with a letter
+  return /^[A-Z]\d[A-Z]/.test(cleaned);
+}
+
 export async function fetchMarketCheckStats(params: {
   vin: string;
   postalCode?: string;
@@ -101,25 +150,32 @@ export async function fetchMarketCheckStats(params: {
 
   const vin = params.vin.trim().toUpperCase();
   const radius = params.radiusMiles ?? 100;
+  
+  // Determine country based on postal code format
+  // Default to Canada since launching in Canada first
+  // US zip codes are 5 digits (12345) or 5+4 (12345-6789)
+  const isUSZipCode = params.postalCode && /^\d{5}(-\d{4})?$/.test(params.postalCode.trim());
+  const country = isUSZipCode ? "us" : "ca";
 
-  // Simple, broad search - prioritize getting results over precision
+  // Search for comparable vehicles by YMM with location
   async function doSearch(options: {
     useYMM: boolean;
     includeLocation: boolean;
     modelOnly?: boolean;
+    searchCountry: string;
   }): Promise<{ listings: Listing[]; numFound: number }> {
     const searchParams = new URLSearchParams({
       api_key: MARKETCHECK_API_KEY!,
       car_type: "used",
       rows: "50",
+      country: options.searchCountry,
     });
 
-    // Only add location if we have a postal code AND includeLocation is true
+    // Add location filter if we have a postal code AND includeLocation is true
     if (options.includeLocation && params.postalCode) {
       searchParams.set("zip", params.postalCode.replace(/\s/g, ""));
       searchParams.set("radius", radius.toString());
     }
-    // No radius without zip - let MarketCheck return nationwide results
 
     if (options.useYMM) {
       if (params.year) searchParams.set("year", params.year.toString());
@@ -146,6 +202,14 @@ export async function fetchMarketCheckStats(params: {
 
     const data = await response.json();
     console.log("[MarketCheck] Raw response num_found:", data.num_found);
+    // Debug: log first listing structure to see where vehicle info is
+    if (data.listings?.[0]) {
+      const sample = data.listings[0];
+      console.log("[MarketCheck] Sample listing keys:", Object.keys(sample));
+      console.log("[MarketCheck] Sample build:", sample.build);
+      console.log("[MarketCheck] Sample heading:", sample.heading);
+      console.log("[MarketCheck] Sample year/make/model:", sample.year, sample.make, sample.model);
+    }
     return {
       listings: data.listings || [],
       numFound: data.num_found || (data.listings?.length ?? 0),
@@ -161,22 +225,22 @@ export async function fetchMarketCheckStats(params: {
     if (params.year && params.make && params.model) {
       // 1. Try YMM with location first (best case: local comps)
       if (params.postalCode) {
-        console.log("[MarketCheck] Trying YMM + location...");
-        result = await doSearch({ useYMM: true, includeLocation: true });
+        console.log("[MarketCheck] Trying YMM + location in", country, "...");
+        result = await doSearch({ useYMM: true, includeLocation: true, searchCountry: country });
         console.log("[MarketCheck] YMM + location found:", result.numFound, "listings");
       }
 
-      // 2. If no local results, try YMM nationwide
+      // 2. If no local results, try YMM nationwide (same country)
       if (result.numFound === 0) {
-        console.log("[MarketCheck] Trying YMM nationwide...");
-        result = await doSearch({ useYMM: true, includeLocation: false });
+        console.log("[MarketCheck] Trying YMM nationwide in", country, "...");
+        result = await doSearch({ useYMM: true, includeLocation: false, searchCountry: country });
         console.log("[MarketCheck] YMM nationwide found:", result.numFound, "listings");
       }
 
-      // 3. If still nothing, try Year + Make only (broader search)
+      // 3. If still nothing, try Year + Make only (broader search, same country)
       if (result.numFound === 0) {
-        console.log("[MarketCheck] Trying Year + Make only...");
-        result = await doSearch({ useYMM: true, includeLocation: false, modelOnly: true });
+        console.log("[MarketCheck] Trying Year + Make only in", country, "...");
+        result = await doSearch({ useYMM: true, includeLocation: false, modelOnly: true, searchCountry: country });
         console.log("[MarketCheck] Year + Make found:", result.numFound, "listings");
       }
     }
@@ -184,7 +248,7 @@ export async function fetchMarketCheckStats(params: {
     // 4. As last resort, try VIN search (very specific, often returns 0)
     if (result.numFound === 0) {
       console.log("[MarketCheck] Trying VIN search...");
-      result = await doSearch({ useYMM: false, includeLocation: false });
+      result = await doSearch({ useYMM: false, includeLocation: false, searchCountry: country });
       console.log("[MarketCheck] VIN search found:", result.numFound, "listings");
     }
 
@@ -205,6 +269,9 @@ export async function fetchMarketCheckStats(params: {
         dealerListingsCount: null,
         privateListingsCount: null,
         marketDemandScore: null,
+        maxDistanceMiles: null,
+        country: country as "us" | "ca",
+        listings: [],
         raw: { num_found: 0, message: "No comparable listings found" },
       };
     }
@@ -274,16 +341,45 @@ export async function fetchMarketCheckStats(params: {
         state: l.state,
         zip: l.zip,
         dealer_type: l.dealer_type,
-        year: l.year,
-        make: l.make,
-        model: l.model,
-        trim: l.trim,
-        exterior_color: l.exterior_color,
-        drivetrain: l.drivetrain,
-        transmission: l.transmission,
+        heading: l.heading,
+        year: l.build?.year ?? l.year,
+        make: l.build?.make ?? l.make,
+        model: l.build?.model ?? l.model,
+        trim: l.build?.trim ?? l.trim,
+        exterior_color: l.build?.exterior_color ?? l.exterior_color,
+        drivetrain: l.build?.drivetrain ?? l.drivetrain,
+        transmission: l.build?.transmission ?? l.transmission,
         vdp_url: l.vdp_url,
       })),
     };
+
+    // Convert listings to ComparableListing format for client-side filtering
+    // MarketCheck API returns vehicle info in nested 'build' object
+    const comparableListings: ComparableListing[] = listings.map((l) => ({
+      price: l.price ?? null,
+      miles: l.miles ?? null,
+      daysOnMarket: l.dom ?? l.dom_active ?? l.dom_180 ?? null,
+      distanceMiles: l.dist ?? null,
+      city: l.city ?? null,
+      state: l.state ?? null,
+      zip: l.zip ?? null,
+      dealerType: l.dealer_type ?? l.seller_type ?? null,
+      // Extract from build object first, then fall back to root level
+      year: l.build?.year ?? l.year ?? null,
+      make: l.build?.make ?? l.make ?? null,
+      model: l.build?.model ?? l.model ?? null,
+      trim: l.build?.trim ?? l.trim ?? null,
+      exteriorColor: l.build?.exterior_color ?? l.exterior_color ?? null,
+      transmission: l.build?.transmission ?? l.transmission ?? null,
+      heading: l.heading ?? null,
+      vdpUrl: l.vdp_url ?? null,
+    }));
+
+    // Calculate max distance from listings
+    const distances = listings
+      .map((l) => l.dist)
+      .filter((d): d is number => typeof d === "number" && d >= 0);
+    const maxDistanceMiles = distances.length > 0 ? Math.max(...distances) : null;
 
     return {
       priceLowCents: priceLow ? Math.round(priceLow * 100) : null,
@@ -298,6 +394,9 @@ export async function fetchMarketCheckStats(params: {
       dealerListingsCount: dealerListings.length,
       privateListingsCount: privateListings.length,
       marketDemandScore: demandScore,
+      maxDistanceMiles,
+      country: country as "us" | "ca",
+      listings: comparableListings,
       raw: trimmedRaw,
     };
   } catch (err) {

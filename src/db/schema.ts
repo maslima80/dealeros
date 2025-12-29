@@ -1,4 +1,4 @@
-import { boolean, date, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid, index } from "drizzle-orm/pg-core";
+import { boolean, date, integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, unique, uuid, index } from "drizzle-orm/pg-core";
 
 export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "trial",
@@ -76,23 +76,88 @@ export const vehicles = pgTable(
     dealerId: uuid("dealer_id")
       .notNull()
       .references(() => dealers.id, { onDelete: "cascade" }),
+    
+    // Core Identity
     vin: text("vin").notNull(),
     year: integer("year"),
     make: text("make"),
     model: text("model"),
     trim: text("trim"),
+    bodyStyle: text("body_style"),
+    
+    // Mechanical
+    drivetrain: text("drivetrain"),
+    transmission: text("transmission"),
+    engine: text("engine"),
+    engineDisplacementL: numeric("engine_displacement_l", { precision: 3, scale: 1 }),
+    cylinders: integer("cylinders"),
+    fuelType: text("fuel_type"),
+    
+    // Capacity
+    doors: integer("doors"),
+    seats: integer("seats"),
+    
+    // Listing Essentials
     odometerKm: integer("odometer_km"),
+    mileageUnit: text("mileage_unit").notNull().default("KM"),
+    exteriorColor: text("exterior_color"),
+    interiorColor: text("interior_color"),
+    condition: text("condition").notNull().default("used"),
+    stockNumber: text("stock_number"),
+    askingPriceCents: integer("asking_price_cents"),
+    currency: text("currency").notNull().default("CAD"),
+    
+    // Purchase Info
     purchasePriceCents: integer("purchase_price_cents"),
     purchaseNote: text("purchase_note"),
     purchaseReceiptUrl: text("purchase_receipt_url"),
-    askingPriceCents: integer("asking_price_cents"),
+    
+    // Visibility + Workflow
     status: vehicleStatusEnum("status").notNull().default("purchased"),
     isPublic: boolean("is_public").notNull().default(false),
+    
+    // High-signal Feature Flags
+    hasSunroof: boolean("has_sunroof").notNull().default(false),
+    hasNavigation: boolean("has_navigation").notNull().default(false),
+    hasBackupCamera: boolean("has_backup_camera").notNull().default(false),
+    hasParkingSensors: boolean("has_parking_sensors").notNull().default(false),
+    hasBlindSpotMonitor: boolean("has_blind_spot_monitor").notNull().default(false),
+    hasHeatedSeats: boolean("has_heated_seats").notNull().default(false),
+    hasRemoteStart: boolean("has_remote_start").notNull().default(false),
+    hasAppleCarplay: boolean("has_apple_carplay").notNull().default(false),
+    hasAndroidAuto: boolean("has_android_auto").notNull().default(false),
+    hasBluetooth: boolean("has_bluetooth").notNull().default(false),
+    hasLeather: boolean("has_leather").notNull().default(false),
+    hasThirdRow: boolean("has_third_row").notNull().default(false),
+    hasTowPackage: boolean("has_tow_package").notNull().default(false),
+    hasAlloyWheels: boolean("has_alloy_wheels").notNull().default(false),
+    
+    // Decode Metadata
+    decodeProvider: text("decode_provider"),
+    decodeStatus: text("decode_status"),
+    decodedAt: timestamp("decoded_at", { withTimezone: true }),
+    decodeRaw: jsonb("decode_raw"),
+    
+    // Equipment/Options Raw JSON
+    equipmentRaw: jsonb("equipment_raw"),
+    packagesRaw: jsonb("packages_raw"),
+    optionsRaw: jsonb("options_raw"),
+    
+    // Custom Features (free-form chips)
+    customFeatures: jsonb("custom_features").notNull().default([]),
+    
+    // Notes
     notes: text("notes"),
+    notesInternal: text("notes_internal"),
+    notesPublic: text("notes_public"),
+    
+    // Sale Info (legacy)
     soldAt: timestamp("sold_at", { withTimezone: true }),
     soldPriceCents: integer("sold_price_cents"),
     soldCurrency: text("sold_currency").default("CAD"),
     buyerName: text("buyer_name"),
+    
+    // Timestamps
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
