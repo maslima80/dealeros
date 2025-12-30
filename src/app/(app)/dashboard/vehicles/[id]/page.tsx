@@ -9,9 +9,8 @@ import { getPhotosForVehicle } from "@/lib/vehicle-photos";
 import { getCostsForVehicle, getAdditionalCostsTotalForVehicle } from "@/lib/vehicle-costs";
 import { generateListingPayload } from "@/lib/listing-kit";
 import { getSaleByVehicleId } from "@/lib/sales";
-import { PageHeader } from "@/components/ui";
 
-import { VehicleDetailClient } from "./vehicle-detail-client";
+import { VehiclePageV2 } from "./vehicle-page-v2";
 import { VehiclePhotosSection } from "./vehicle-photos-section";
 import { MarketSnapshotCard } from "./market-snapshot-card";
 import { CostsSection } from "./costs-section";
@@ -117,126 +116,137 @@ export default async function VehicleDetailPage({
       }
     : null;
 
-  const ymmt = [vehicle.year, vehicle.make, vehicle.model, vehicle.trim]
-    .filter(Boolean)
-    .join(" ");
-  const displayTitle = ymmt || vehicle.vin;
+  // Prepare props for the redesigned component
+  const photosData = photos.map((p) => ({
+    id: p.id,
+    url: p.url,
+    position: p.position,
+    isCover: p.isCover,
+  }));
+
+  const costsData = costs.map((c) => ({
+    id: c.id,
+    amountCents: c.amountCents,
+    vendor: c.vendor,
+    note: c.note,
+    receiptUrl: c.receiptUrl,
+    costDate: c.costDate,
+    createdAt: c.createdAt,
+  }));
+
+  const saleData = sale ? {
+    id: sale.id,
+    saleDate: sale.saleDate,
+    salePriceCents: sale.salePriceCents,
+    buyerFullName: sale.buyerFullName,
+    pdfUrl: sale.pdfUrl,
+  } : null;
+
+  const listingPayloadData = listingPayload ? {
+    headline: listingPayload.listing.headline,
+    description: listingPayload.listing.description,
+    specsText: listingPayload.listing.specsText,
+    publicVehicleUrl: listingPayload.publicVehicleUrl,
+    hasPhotos: listingPayload.photos.length > 0,
+  } : null;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={displayTitle}
-        subtitle={ymmt ? vehicle.vin : undefined}
-        backHref="/dashboard/vehicles"
-        backLabel="Back to vehicles"
-      />
-
-      <SaleSection
-        vehicleId={vehicle.id}
-        vehicleStatus={vehicle.status}
-        odometerKm={vehicle.odometerKm}
-        sale={sale ? {
-          id: sale.id,
-          saleDate: sale.saleDate,
-          salePriceCents: sale.salePriceCents,
-          buyerFullName: sale.buyerFullName,
-          pdfUrl: sale.pdfUrl,
-        } : null}
-      />
-
-      <VehiclePhotosSection
-        vehicleId={vehicle.id}
-        photos={photos.map((p) => ({
-          id: p.id,
-          url: p.url,
-          position: p.position,
-          isCover: p.isCover,
-        }))}
-      />
-
-      <MarketSnapshotCard
-        vehicleId={vehicle.id}
-        initialSnapshot={existingSnapshot}
-        vin={vehicle.vin ?? undefined}
-        dealerPostalCode={dealerPostalCode}
-      />
-
-      <CostsSection
-        vehicleId={vehicle.id}
-        costs={costs.map((c) => ({
-          id: c.id,
-          amountCents: c.amountCents,
-          vendor: c.vendor,
-          note: c.note,
-          receiptUrl: c.receiptUrl,
-          costDate: c.costDate,
-          createdAt: c.createdAt,
-        }))}
-        purchasePriceCents={vehicle.purchasePriceCents ?? null}
-        purchaseNote={vehicle.purchaseNote ?? null}
-        purchaseReceiptUrl={vehicle.purchaseReceiptUrl ?? null}
-        additionalCostsCents={additionalCostsCents}
-        askingPriceCents={vehicle.askingPriceCents ?? null}
-      />
-
-      <VehicleDetailClient
-        vehicle={{
-          id: vehicle.id,
-          vin: vehicle.vin,
-          year: vehicle.year,
-          make: vehicle.make,
-          model: vehicle.model,
-          trim: vehicle.trim,
-          bodyStyle: vehicle.bodyStyle,
-          drivetrain: vehicle.drivetrain,
-          transmission: vehicle.transmission,
-          engine: vehicle.engine,
-          fuelType: vehicle.fuelType,
-          doors: vehicle.doors,
-          seats: vehicle.seats,
-          odometerKm: vehicle.odometerKm,
-          mileageUnit: vehicle.mileageUnit,
-          exteriorColor: vehicle.exteriorColor,
-          interiorColor: vehicle.interiorColor,
-          stockNumber: vehicle.stockNumber,
-          status: vehicle.status,
-          isPublic: vehicle.isPublic,
-          notes: vehicle.notes,
-          // Feature flags
-          hasSunroof: vehicle.hasSunroof,
-          hasNavigation: vehicle.hasNavigation,
-          hasBackupCamera: vehicle.hasBackupCamera,
-          hasParkingSensors: vehicle.hasParkingSensors,
-          hasBlindSpotMonitor: vehicle.hasBlindSpotMonitor,
-          hasHeatedSeats: vehicle.hasHeatedSeats,
-          hasRemoteStart: vehicle.hasRemoteStart,
-          hasAppleCarplay: vehicle.hasAppleCarplay,
-          hasAndroidAuto: vehicle.hasAndroidAuto,
-          hasBluetooth: vehicle.hasBluetooth,
-          hasLeather: vehicle.hasLeather,
-          hasThirdRow: vehicle.hasThirdRow,
-          hasTowPackage: vehicle.hasTowPackage,
-          hasAlloyWheels: vehicle.hasAlloyWheels,
-          // Custom features
-          customFeatures: (vehicle.customFeatures as string[]) ?? [],
-          // Decode metadata
-          decodeProvider: vehicle.decodeProvider,
-          decodeStatus: vehicle.decodeStatus,
-          decodedAt: vehicle.decodedAt,
-          equipmentRaw: vehicle.equipmentRaw as string[] | null,
-        }}
-      />
-
-      {listingPayload && (
-        <ListingKitSection
+    <VehiclePageV2
+      vehicle={{
+        id: vehicle.id,
+        vin: vehicle.vin,
+        year: vehicle.year,
+        make: vehicle.make,
+        model: vehicle.model,
+        trim: vehicle.trim,
+        bodyStyle: vehicle.bodyStyle,
+        drivetrain: vehicle.drivetrain,
+        transmission: vehicle.transmission,
+        engine: vehicle.engine,
+        fuelType: vehicle.fuelType,
+        doors: vehicle.doors,
+        seats: vehicle.seats,
+        odometerKm: vehicle.odometerKm,
+        mileageUnit: vehicle.mileageUnit,
+        exteriorColor: vehicle.exteriorColor,
+        interiorColor: vehicle.interiorColor,
+        stockNumber: vehicle.stockNumber,
+        status: vehicle.status,
+        isPublic: vehicle.isPublic,
+        notes: vehicle.notes,
+        purchasePriceCents: vehicle.purchasePriceCents,
+        askingPriceCents: vehicle.askingPriceCents,
+        hasSunroof: vehicle.hasSunroof,
+        hasNavigation: vehicle.hasNavigation,
+        hasBackupCamera: vehicle.hasBackupCamera,
+        hasParkingSensors: vehicle.hasParkingSensors,
+        hasBlindSpotMonitor: vehicle.hasBlindSpotMonitor,
+        hasHeatedSeats: vehicle.hasHeatedSeats,
+        hasRemoteStart: vehicle.hasRemoteStart,
+        hasAppleCarplay: vehicle.hasAppleCarplay,
+        hasAndroidAuto: vehicle.hasAndroidAuto,
+        hasBluetooth: vehicle.hasBluetooth,
+        hasLeather: vehicle.hasLeather,
+        hasThirdRow: vehicle.hasThirdRow,
+        hasTowPackage: vehicle.hasTowPackage,
+        hasAlloyWheels: vehicle.hasAlloyWheels,
+        customFeatures: (vehicle.customFeatures as string[]) ?? [],
+        equipmentRaw: vehicle.equipmentRaw as string[] | null,
+      }}
+      photos={photosData}
+      costs={costsData}
+      additionalCostsCents={additionalCostsCents}
+      sale={saleData}
+      listingPayload={listingPayloadData}
+      marketSnapshotComponent={
+        <MarketSnapshotCard
           vehicleId={vehicle.id}
-          headline={listingPayload.listing.headline}
-          description={listingPayload.listing.description}
-          specsText={listingPayload.listing.specsText}
-          publicVehicleUrl={listingPayload.publicVehicleUrl}
-          hasPhotos={listingPayload.photos.length > 0}
+          initialSnapshot={existingSnapshot}
+          vin={vehicle.vin ?? undefined}
+          dealerPostalCode={dealerPostalCode}
         />
-      )}
-    </div>
+      }
+      photosComponent={
+        <VehiclePhotosSection
+          vehicleId={vehicle.id}
+          photos={photosData}
+        />
+      }
+      costsComponent={
+        <CostsSection
+          vehicleId={vehicle.id}
+          costs={costsData}
+          purchasePriceCents={vehicle.purchasePriceCents ?? null}
+          purchaseNote={vehicle.purchaseNote ?? null}
+          purchaseReceiptUrl={vehicle.purchaseReceiptUrl ?? null}
+          additionalCostsCents={additionalCostsCents}
+          askingPriceCents={vehicle.askingPriceCents ?? null}
+        />
+      }
+      listingKitComponent={
+        listingPayload ? (
+          <ListingKitSection
+            vehicleId={vehicle.id}
+            headline={listingPayload.listing.headline}
+            description={listingPayload.listing.description}
+            specsText={listingPayload.listing.specsText}
+            publicVehicleUrl={listingPayload.publicVehicleUrl}
+            hasPhotos={listingPayload.photos.length > 0}
+          />
+        ) : (
+          <div className="text-center py-8 text-zinc-500">
+            <p>Add vehicle details and photos to generate listing materials.</p>
+          </div>
+        )
+      }
+      saleComponent={
+        <SaleSection
+          vehicleId={vehicle.id}
+          vehicleStatus={vehicle.status}
+          odometerKm={vehicle.odometerKm}
+          sale={saleData}
+        />
+      }
+    />
   );
 }
